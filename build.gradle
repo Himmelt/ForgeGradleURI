@@ -3,6 +3,9 @@ plugins {
     id 'org.ajoberstar.grgit' version '3.0.0'
     id 'com.github.ben-manes.versions' version '0.20.0'
     //id 'com.github.johnrengelman.shadow' version '2.0.4'
+    id 'com.gradle.plugin-publish' version "0.10.1"
+    id 'java-gradle-plugin'
+    id 'com.jfrog.artifactory' version '4.15.1'
 }
 
 apply plugin: 'java'
@@ -16,6 +19,12 @@ compileJava {
 
 group = 'net.minecraftforge.gradle'
 version = gitVersion()
+
+boolean snapshot = true
+
+def _BINTRAY_USER = System.getenv('BINTRAY_USER')
+def _BINTRAY_KEY = System.getenv('BINTRAY_KEY')
+def _REPO_KEY = snapshot ? 'oss-snapshot-local' : 'oss-release-local'
 
 def gitVersion() {
     def raw = grgit.describe(longDescr: true, tags: true)
@@ -109,23 +118,45 @@ project.extensions.eclipse.classpath.file.whenMerged { Classpath cp ->
     }
 }
 
+gradlePlugin {
+    plugins {
+        mcpPlugin{
+            id = 'org.soraworld.forge-mcp'
+            implementationClass = 'net.minecraftforge.gradle.mcp.MCPPlugin'
+        }
+        patcherPlugin{
+            id = 'org.soraworld.forge-patcher'
+            implementationClass = 'net.minecraftforge.gradle.patcher.PatcherPlugin'
+        }
+        userDevPlugin {
+            id = 'org.soraworld.forge-userdev'
+            implementationClass = 'net.minecraftforge.gradle.userdev.UserDevPlugin'
+        }
+    }
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
+            groupId = 'org.soraworld'
+            artifactId = 'forge-gradle-uri'
+            version = project.version + (snapshot ? '-SNAPSHOT' : '')
         }
     }
-    repositories {
-        maven {
-            if (project.hasProperty('forgeMavenPassword')) {
-                credentials {
-                    username project.properties.forgeMavenUser
-                    password project.properties.forgeMavenPassword
-                }
-                url 'https://files.minecraftforge.net/maven/manage/upload'
-            } else {
-                url 'file://' + rootProject.file('repo').getAbsolutePath()
-            }
+}
+
+artifactory {
+    setContextUrl('https://oss.jfrog.org/artifactory')
+    publish {
+        repository {
+            repoKey = _REPO_KEY
+            username = _BINTRAY_USER
+            password = _BINTRAY_KEY
+            maven = true
+        }
+        defaults {
+            publications('mavenJava')
         }
     }
 }
