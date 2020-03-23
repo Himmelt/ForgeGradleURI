@@ -25,6 +25,7 @@ import net.minecraftforge.gradle.common.util.Utils;
 import net.minecraftforge.gradle.common.util.VersionJson;
 import org.apache.commons.io.FileUtils;
 import org.gradle.api.DefaultTask;
+import org.gradle.api.invocation.Gradle;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.TaskAction;
 
@@ -56,8 +57,16 @@ public class DownloadAssets extends DefaultTask {
             Asset asset = index.objects.get(key);
             File target = Utils.getCache(getProject(), "assets", "objects", asset.getPath());
             if (!target.exists() || !HashFunction.SHA1.hash(target).equals(asset.hash)) {
-                URL url = new URL(RESOURCE_REPO + asset.getPath());
-                Runnable copyURLtoFile = () -> {
+                URL tmpUrl = new URL(RESOURCE_REPO + asset.getPath());
+                /////////////////////////////////////////////////
+                try {
+                    tmpUrl = Gradle.postURLRequest.apply(tmpUrl);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+                final URL url = tmpUrl;
+                /////////////////////////////////////////////////
+                Runnable copyUrlToFile = () -> {
                     try {
                         File localFile = FileUtils.getFile(assetsPath + File.separator + asset.getPath());
                         if (localFile.exists()) {
@@ -78,18 +87,18 @@ public class DownloadAssets extends DefaultTask {
                         e.printStackTrace();
                     }
                 };
-                executorService.execute(copyURLtoFile);
+                executorService.execute(copyUrlToFile);
             }
         }
         executorService.shutdown();
         executorService.awaitTermination(8, TimeUnit.HOURS);
         if (!failedDownloads.isEmpty()) {
-            String errorMessage = "";
+            StringBuilder errorMsg = new StringBuilder();
             for (String key : failedDownloads) {
-                errorMessage += "Failed to get asset: " + key + "\n";
+                errorMsg.append("Failed to get asset: ").append(key).append("\n");
             }
-            errorMessage += "Some assets failed to download or validate, try running the task again.";
-            throw new RuntimeException(errorMessage);
+            errorMsg.append("Some assets failed to download or validate, try running the task again.");
+            throw new RuntimeException(errorMsg.toString());
         }
     }
 

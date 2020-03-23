@@ -23,6 +23,7 @@ package net.minecraftforge.gradle.mcp.function;
 import net.minecraftforge.gradle.common.util.Utils;
 import net.minecraftforge.gradle.mcp.util.MCPEnvironment;
 import org.apache.commons.io.FileUtils;
+import org.gradle.api.invocation.Gradle;
 import org.gradle.internal.hash.HashUtil;
 import org.gradle.internal.hash.HashValue;
 
@@ -47,7 +48,7 @@ public abstract class AbstractFileDownloadFunction implements MCPFunction {
 
     @Override
     public File execute(MCPEnvironment environment) throws Exception {
-        File output = (File)environment.getArguments().computeIfAbsent("output", k -> environment.getFile(outputGetter.apply(environment)));
+        File output = (File) environment.getArguments().computeIfAbsent("output", k -> environment.getFile(outputGetter.apply(environment)));
         File download = !output.exists() ? output : environment.getFile(output.getAbsolutePath() + ".new");
 
         Utils.delete(download); // This file should never exist, but abrupt termination of the process may leave it behind
@@ -56,16 +57,24 @@ public abstract class AbstractFileDownloadFunction implements MCPFunction {
         if (info.hash != null && output.exists() && HashUtil.sha1(output).equals(info.hash)) {
             return output; // If the hash matches, don't download again
         }
+        /////////////////////////////////////////////////
+        URL url = new URL(info.url);
+        try {
+            url = Gradle.postURLRequest.apply(url);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        /////////////////////////////////////////////////
         // Check if file exists in local installer cache
-        if (info.type.equals("jar") && info.side.equals("client")) {
+        if ("jar".equals(info.type) && "client".equals(info.side)) {
             File localPath = new File(Utils.getMCDir() + File.separator + "versions" + File.separator + info.version + File.separator + info.version + ".jar");
             if (localPath.exists() && HashUtil.sha1(localPath).equals(info.hash)) {
                 FileUtils.copyFile(localPath, download);
             } else {
-                FileUtils.copyURLToFile(new URL(info.url), download);
+                FileUtils.copyURLToFile(url, download);
             }
         } else {
-            FileUtils.copyURLToFile(new URL(info.url), download);
+            FileUtils.copyURLToFile(url, download);
         }
 
         if (output != download) {
@@ -94,9 +103,6 @@ public abstract class AbstractFileDownloadFunction implements MCPFunction {
             this.type = type;
             this.version = version;
             this.side = side;
-
         }
-
     }
-
 }

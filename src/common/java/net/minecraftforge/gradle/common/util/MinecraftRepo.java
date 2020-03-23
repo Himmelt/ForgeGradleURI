@@ -20,11 +20,26 @@
 
 package net.minecraftforge.gradle.common.util;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import com.amadornes.artifactural.api.artifact.ArtifactIdentifier;
+import com.amadornes.artifactural.api.repository.ArtifactProvider;
+import com.amadornes.artifactural.api.repository.Repository;
+import com.amadornes.artifactural.base.repository.ArtifactProviderBuilder;
+import com.amadornes.artifactural.base.repository.SimpleRepository;
+import com.amadornes.artifactural.gradle.GradleRepositoryAdapter;
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+import net.minecraftforge.gradle.common.config.Config;
+import net.minecraftforge.gradle.common.config.MCPConfigV1;
+import net.minecraftforge.gradle.common.util.VersionJson.Download;
+import net.minecraftforge.gradle.common.util.VersionJson.OS;
+import net.minecraftforge.srgutils.MinecraftVersion;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.gradle.api.Project;
+import org.gradle.api.invocation.Gradle;
+import org.gradle.api.logging.Logger;
+
+import java.io.*;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -35,26 +50,6 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.gradle.api.Project;
-import org.gradle.api.logging.Logger;
-
-import com.amadornes.artifactural.api.artifact.ArtifactIdentifier;
-import com.amadornes.artifactural.api.repository.ArtifactProvider;
-import com.amadornes.artifactural.api.repository.Repository;
-import com.amadornes.artifactural.base.repository.ArtifactProviderBuilder;
-import com.amadornes.artifactural.base.repository.SimpleRepository;
-import com.amadornes.artifactural.gradle.GradleRepositoryAdapter;
-import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
-
-import net.minecraftforge.gradle.common.config.Config;
-import net.minecraftforge.gradle.common.config.MCPConfigV1;
-import net.minecraftforge.gradle.common.util.VersionJson.Download;
-import net.minecraftforge.gradle.common.util.VersionJson.OS;
-import net.minecraftforge.srgutils.MinecraftVersion;
 
 public class MinecraftRepo extends BaseRepo {
     private static MinecraftRepo INSTANCE;
@@ -67,19 +62,21 @@ public class MinecraftRepo extends BaseRepo {
 
     private final Repository repo;
     private final boolean offline;
+
     private MinecraftRepo(File cache, Logger log, boolean offline) {
         super(cache, log);
         this.repo = SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class)
-            .filter(ArtifactIdentifier.groupEquals(GROUP))
-            .filter(ArtifactIdentifier.nameMatches("^(client|server)$"))
-            .provide(this)
+                .filter(ArtifactIdentifier.groupEquals(GROUP))
+                .filter(ArtifactIdentifier.nameMatches("^(client|server)$"))
+                .provide(this)
         );
         this.offline = offline;
     }
 
     private static MinecraftRepo getInstance(Project project) {
-        if (INSTANCE == null)
+        if (INSTANCE == null) {
             INSTANCE = new MinecraftRepo(Utils.getCache(project, "minecraft_repo"), project.getLogger(), project.getGradle().getStartParameter().isOffline());
+        }
         return INSTANCE;
     }
 
@@ -109,22 +106,26 @@ public class MinecraftRepo extends BaseRepo {
     public File findFile(ArtifactIdentifier artifact) throws IOException {
         String side = artifact.getName();
 
-        if (!artifact.getGroup().equals(GROUP) || (!"client".equals(side) && !"server".equals(side)))
+        if (!artifact.getGroup().equals(GROUP) || (!"client".equals(side) && !"server".equals(side))) {
             return null;
+        }
 
         String version = artifact.getVersion();
         boolean forceStable = version.endsWith("-stable");
-        if (forceStable)
+        if (forceStable) {
             version = version.substring(0, version.length() - 7);
+        }
         String mappings = getMappings(version);
-        if (mappings != null)
+        if (mappings != null) {
             return null; //We do not support mappings
+        }
         String classifier = artifact.getClassifier() == null ? "" : artifact.getClassifier();
         String ext = artifact.getExtension();
 
         File json = findVersion(getMCVersion(version));
-        if (json == null)
+        if (json == null) {
             return null; //Not a vanilla version, MCP?
+        }
 
         debug("  " + REPO_NAME + " Request: " + artifact.getGroup() + ":" + side + ":" + version + ":" + classifier + "@" + ext);
 
@@ -134,25 +135,39 @@ public class MinecraftRepo extends BaseRepo {
         } else
          */
         if ("json".equals(ext)) {
-            if ("".equals(classifier))
+            if ("".equals(classifier)) {
                 return findVersion(getMCVersion(version));
+            }
         } else {
             switch (classifier) {
-                case "":         return findRaw(side, version, json);
-                case "slim":     return findSlim(side, version, forceStable, json); //Deprecated - Use MCP Specific version
-                case "data":     return findData(side, version, forceStable, json); //Deprecated - Use extra
-                case "extra":    return findExtra(side, version, forceStable, json); //Deprecated - Use MCP Specific version
-                case "mappings": return findMappings(side, version, json);
+                case "":
+                    return findRaw(side, version, json);
+                case "slim":
+                    return findSlim(side, version, forceStable, json); //Deprecated - Use MCP Specific version
+                case "data":
+                    return findData(side, version, forceStable, json); //Deprecated - Use extra
+                case "extra":
+                    return findExtra(side, version, forceStable, json); //Deprecated - Use MCP Specific version
+                case "mappings":
+                    return findMappings(side, version, json);
             }
         }
         return null;
     }
 
     private File findMcp(String version) throws IOException {
-        net.minecraftforge.gradle.common.util.Artifact mcp = net.minecraftforge.gradle.common.util.Artifact.from("de.oceanlabs.mcp:mcp_config:" + version + "@zip");
+        Artifact mcp = Artifact.from("de.oceanlabs.mcp:mcp_config:" + version + "@zip");
         File zip = cache("versions", version, "mcp.zip");
         if (!zip.exists()) {
-            FileUtils.copyURLToFile(new URL(Utils.FORGE_MAVEN + mcp.getPath()), zip);
+            /////////////////////////////////////////////////
+            URL url = new URL(Utils.FORGE_MAVEN + mcp.getPath());
+            try {
+                url = Gradle.postURLRequest.apply(url);
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+            /////////////////////////////////////////////////
+            FileUtils.copyURLToFile(url, zip);
             Utils.updateHash(zip);
         }
         return zip;
@@ -160,8 +175,6 @@ public class MinecraftRepo extends BaseRepo {
 
     private File findMcpMappings(String version) throws IOException {
         File mcp = findMcp(version);
-        if (mcp == null)
-            return null;
 
         File mappings = cache("versions", version, "mcp_mappings.tsrg");
         HashStore cache = commonCache(cache("versions", version, "mcp_mappings.tsrg"));
@@ -187,17 +200,20 @@ public class MinecraftRepo extends BaseRepo {
 
     private File findVersion(String version) throws IOException {
         File manifest = cache("versions/manifest.json");
-        if (!Utils.downloadEtag(new URL(MANIFEST_URL), manifest, offline))
+        if (!Utils.downloadEtag(new URL(MANIFEST_URL), manifest, offline)) {
             return null;
+        }
         Utils.updateHash(manifest, HashFunction.SHA1);
 
         File json = cache("versions", version, "version.json");
-        URL url =  Utils.loadJson(manifest, ManifestJson.class).getUrl(version);
-        if (url == null)
+        URL url = Utils.loadJson(manifest, ManifestJson.class).getUrl(version);
+        if (url == null) {
             throw new RuntimeException("Missing version from manifest: " + version);
+        }
 
-        if (!Utils.downloadEtag(url, json, offline))
+        if (!Utils.downloadEtag(url, json, offline)) {
             return null;
+        }
         Utils.updateHash(json, HashFunction.SHA1);
         return json;
     }
@@ -254,11 +270,19 @@ public class MinecraftRepo extends BaseRepo {
 
     private File findDownloadEntry(String key, File target, String version, File json_file) throws IOException {
         VersionJson json = Utils.loadJson(json_file, VersionJson.class);
-        if (json.downloads == null || !json.downloads.containsKey(key))
+        if (json.downloads == null || !json.downloads.containsKey(key)) {
             throw new IllegalStateException(version + ".json missing download for " + key);
+        }
 
         Download dl = json.downloads.get(key);
         if (!target.exists() || !HashFunction.SHA1.hash(target).equals(dl.sha1)) {
+            /////////////////////////////////////////////////
+            try {
+                dl.url = Gradle.postURLRequest.apply(dl.url);
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+            /////////////////////////////////////////////////
             FileUtils.copyURLToFile(dl.url, target);
             Utils.updateHash(target, HashFunction.SHA1);
         }
@@ -316,12 +340,12 @@ public class MinecraftRepo extends BaseRepo {
             Set<String> whitelist = new HashSet<>();
             List<String> lines = Utils.lines(mappings).map(line -> line.split("#")[0]).filter(l -> !Strings.isNullOrEmpty(l.trim())).collect(Collectors.toList()); //Strip comments and empty lines
             lines.stream()
-            .filter(line -> !line.startsWith("\t") || (line.indexOf(':') != -1 && line.startsWith("CL:"))) // Class lines only
-            .map(line -> line.indexOf(':') != -1 ? line.substring(4).split(" ") : line.split(" ")) //Convert to: OBF SRG
-            .filter(pts -> pts.length == 2 && !pts[0].endsWith("/")) //Skip packages
-            .forEach(pts -> whitelist.add(pts[0]));
+                    .filter(line -> !line.startsWith("\t") || (line.indexOf(':') != -1 && line.startsWith("CL:"))) // Class lines only
+                    .map(line -> line.indexOf(':') != -1 ? line.substring(4).split(" ") : line.split(" ")) //Convert to: OBF SRG
+                    .filter(pts -> pts.length == 2 && !pts[0].endsWith("/")) //Skip packages
+                    .forEach(pts -> whitelist.add(pts[0]));
 
-            for (Enumeration<? extends ZipEntry> entries = zin.entries(); entries.hasMoreElements();) {
+            for (Enumeration<? extends ZipEntry> entries = zin.entries(); entries.hasMoreElements(); ) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 if (name.endsWith(".class")) {
@@ -362,7 +386,7 @@ public class MinecraftRepo extends BaseRepo {
                  FileOutputStream fos = new FileOutputStream(extra);
                  ZipOutputStream out = new ZipOutputStream(fos)) {
 
-                for (Enumeration<? extends ZipEntry> entries = zin.entries(); entries.hasMoreElements();) {
+                for (Enumeration<? extends ZipEntry> entries = zin.entries(); entries.hasMoreElements(); ) {
                     ZipEntry entry = entries.nextElement();
                     String name = entry.getName();
                     if (!name.endsWith(".class")) {
@@ -386,19 +410,22 @@ public class MinecraftRepo extends BaseRepo {
     private static class MCPWrapperSlim {
         private final File data;
         private final MCPConfigV1 config;
+
         public MCPWrapperSlim(File data) throws IOException {
             this.data = data;
             byte[] cfg_data = Utils.getZipData(data, "config.json");
             int spec = Config.getSpec(cfg_data);
-            if (spec != 1)
+            if (spec != 1) {
                 throw new IllegalStateException("Could not load MCP config, Unknown Spec: " + spec + " File: " + data);
+            }
             this.config = MCPConfigV1.get(cfg_data);
         }
 
         public void extractData(File target, String... path) throws IOException {
             String name = config.getData(path);
-            if (name == null)
+            if (name == null) {
                 throw new IOException("Unknown MCP Entry: " + Joiner.on("/").join(path));
+            }
 
             try (ZipFile zip = new ZipFile(data)) {
                 Utils.extractFile(zip, name, target);
