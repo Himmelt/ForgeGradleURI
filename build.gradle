@@ -3,14 +3,13 @@ plugins {
     id 'org.ajoberstar.grgit' version '3.0.0'
     id 'com.github.ben-manes.versions' version '0.20.0'
     //id 'com.github.johnrengelman.shadow' version '2.0.4'
-    id 'com.gradle.plugin-publish' version "0.10.1"
-    id 'java-gradle-plugin'
     id 'com.jfrog.artifactory' version '4.15.1'
 }
 
 apply plugin: 'java'
-apply plugin: 'maven-publish'
 apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.artifactory'
 
 sourceCompatibility = targetCompatibility = '1.8' // Need this here so eclipse task generates correctly.
 compileJava {
@@ -118,29 +117,12 @@ project.extensions.eclipse.classpath.file.whenMerged { Classpath cp ->
     }
 }
 
-gradlePlugin {
-    plugins {
-        mcpPlugin{
-            id = 'org.soraworld.forge-mcp'
-            implementationClass = 'net.minecraftforge.gradle.mcp.MCPPlugin'
-        }
-        patcherPlugin{
-            id = 'org.soraworld.forge-patcher'
-            implementationClass = 'net.minecraftforge.gradle.patcher.PatcherPlugin'
-        }
-        userDevPlugin {
-            id = 'org.soraworld.forge-userdev'
-            implementationClass = 'net.minecraftforge.gradle.userdev.UserDevPlugin'
-        }
-    }
-}
-
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
             groupId = 'org.soraworld'
-            artifactId = 'forge-gradle-uri'
+            artifactId = 'ForgeGradleURI'
             version = project.version + (snapshot ? '-SNAPSHOT' : '')
         }
     }
