@@ -36,8 +36,8 @@ import net.minecraftforge.srgutils.MinecraftVersion;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
-import org.gradle.api.invocation.Gradle;
 import org.gradle.api.logging.Logger;
+import org.soraworld.gradle.forge.GradleURI;
 
 import java.io.*;
 import java.net.URL;
@@ -161,11 +161,7 @@ public class MinecraftRepo extends BaseRepo {
         if (!zip.exists()) {
             /////////////////////////////////////////////////
             URL url = new URL(Utils.FORGE_MAVEN + mcp.getPath());
-            try {
-                url = Gradle.postURLRequest.apply(url);
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
+            url = GradleURI.postURLRequest(url);
             /////////////////////////////////////////////////
             FileUtils.copyURLToFile(url, zip);
             Utils.updateHash(zip);
@@ -277,11 +273,7 @@ public class MinecraftRepo extends BaseRepo {
         Download dl = json.downloads.get(key);
         if (!target.exists() || !HashFunction.SHA1.hash(target).equals(dl.sha1)) {
             /////////////////////////////////////////////////
-            try {
-                dl.url = Gradle.postURLRequest.apply(dl.url);
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
+            dl.url = GradleURI.postURLRequest(dl.url);
             /////////////////////////////////////////////////
             FileUtils.copyURLToFile(dl.url, target);
             Utils.updateHash(target, HashFunction.SHA1);

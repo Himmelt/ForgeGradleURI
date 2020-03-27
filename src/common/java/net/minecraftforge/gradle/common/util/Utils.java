@@ -37,9 +37,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
-import org.gradle.api.invocation.Gradle;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.TaskProvider;
+import org.soraworld.gradle.forge.GradleURI;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -217,11 +217,7 @@ public class Utils {
     public static File updateDownload(Project project, File target, Download dl) throws IOException {
         if (!target.exists() || !HashFunction.SHA1.hash(target).equals(dl.sha1)) {
             /////////////////////////////////////////////////
-            try {
-                dl.url = Gradle.postURLRequest(dl.url);
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
+            dl.url = GradleURI.postURLRequest(dl.url);
             /////////////////////////////////////////////////
             project.getLogger().lifecycle("Downloading: " + dl.url);
 
@@ -339,11 +335,7 @@ public class Utils {
 
     public static boolean downloadEtag(URL url, File output, boolean offline) throws IOException {
         /////////////////////////////////////////////////
-        try {
-            url = Gradle.postURLRequest(url);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+        url = GradleURI.postURLRequest(url);
         /////////////////////////////////////////////////
         if (output.exists() && output.lastModified() > System.currentTimeMillis() - CACHE_TIMEOUT) {
             return true;
@@ -398,11 +390,7 @@ public class Utils {
 
     public static boolean downloadFile(URL url, File output, boolean deleteOn404) {
         /////////////////////////////////////////////////
-        try {
-            url = Gradle.postURLRequest(url);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+        url = GradleURI.postURLRequest(url);
         /////////////////////////////////////////////////
         String proto = url.getProtocol().toLowerCase();
 
@@ -460,11 +448,7 @@ public class Utils {
 
     public static String downloadString(URL url) throws IOException {
         /////////////////////////////////////////////////
-        try {
-            url = Gradle.postURLRequest(url);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+        url = GradleURI.postURLRequest(url);
         /////////////////////////////////////////////////
         String proto = url.getProtocol().toLowerCase();
 
@@ -554,7 +538,7 @@ public class Utils {
 
     private static void testServerConnection(String url) {
         /////////////////////////////////////////////////
-        url = Gradle.postURIRequest(url);
+        url = GradleURI.postURIRequest(url);
         /////////////////////////////////////////////////
         try {
             HttpsURLConnection conn = (HttpsURLConnection)new URL(url).openConnection();

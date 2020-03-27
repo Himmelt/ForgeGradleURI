@@ -23,9 +23,9 @@ package net.minecraftforge.gradle.mcp.function;
 import net.minecraftforge.gradle.common.util.Utils;
 import net.minecraftforge.gradle.mcp.util.MCPEnvironment;
 import org.apache.commons.io.FileUtils;
-import org.gradle.api.invocation.Gradle;
 import org.gradle.internal.hash.HashUtil;
 import org.gradle.internal.hash.HashValue;
+import org.soraworld.gradle.forge.GradleURI;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -59,11 +59,7 @@ public abstract class AbstractFileDownloadFunction implements MCPFunction {
         }
         /////////////////////////////////////////////////
         URL url = new URL(info.url);
-        try {
-            url = Gradle.postURLRequest.apply(url);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
+        url = GradleURI.postURLRequest(url);
         /////////////////////////////////////////////////
         // Check if file exists in local installer cache
         if ("jar".equals(info.type) && "client".equals(info.side)) {

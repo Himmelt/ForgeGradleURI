@@ -20,14 +20,13 @@
 
 package net.minecraftforge.gradle.common.task;
 
-import net.minecraftforge.gradle.common.util.HashFunction;
 import net.minecraftforge.gradle.common.util.Utils;
 import net.minecraftforge.gradle.common.util.VersionJson;
 import org.apache.commons.io.FileUtils;
 import org.gradle.api.DefaultTask;
-import org.gradle.api.invocation.Gradle;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.TaskAction;
+import org.soraworld.gradle.forge.GradleURI;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,14 +56,8 @@ public class DownloadAssets extends DefaultTask {
             Asset asset = index.objects.get(key);
             File target = Utils.getCache(getProject(), "assets", "objects", asset.getPath());
             if (!target.exists() || !HashFunction.SHA1.hash(target).equals(asset.hash)) {
-                URL tmpUrl = new URL(RESOURCE_REPO + asset.getPath());
                 /////////////////////////////////////////////////
-                try {
-                    tmpUrl = Gradle.postURLRequest.apply(tmpUrl);
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
-                final URL url = tmpUrl;
+                final URL url = GradleURI.postURLRequest(new URL(RESOURCE_REPO + asset.getPath()));
                 /////////////////////////////////////////////////
                 Runnable copyUrlToFile = () -> {
                     try {
