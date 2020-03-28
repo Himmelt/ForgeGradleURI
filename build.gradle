@@ -49,7 +49,6 @@ jar {
 
 repositories {
     maven { url 'https://maven.aliyun.com/repository/public/' }
-    maven { url 'https://lss233.littleservice.cn/repositories/minecraft' }
     maven { url 'https://files.minecraftforge.net/maven' }
 }
 
