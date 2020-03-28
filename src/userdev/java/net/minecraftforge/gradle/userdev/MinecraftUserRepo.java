@@ -40,16 +40,7 @@ import net.minecraftforge.gradle.common.task.ApplyBinPatches;
 import net.minecraftforge.gradle.common.task.DownloadAssets;
 import net.minecraftforge.gradle.common.task.DynamicJarExec;
 import net.minecraftforge.gradle.common.task.ExtractNatives;
-import net.minecraftforge.gradle.common.util.Artifact;
-import net.minecraftforge.gradle.common.util.BaseRepo;
-import net.minecraftforge.gradle.common.util.HashFunction;
-import net.minecraftforge.gradle.common.util.HashStore;
-import net.minecraftforge.gradle.common.util.MappingFile;
-import net.minecraftforge.gradle.common.util.MavenArtifactDownloader;
-import net.minecraftforge.gradle.common.util.McpNames;
-import net.minecraftforge.gradle.common.util.POMBuilder;
-import net.minecraftforge.gradle.common.util.RunConfig;
-import net.minecraftforge.gradle.common.util.Utils;
+import net.minecraftforge.gradle.common.util.*;
 import net.minecraftforge.gradle.mcp.MCPRepo;
 import net.minecraftforge.gradle.mcp.function.AccessTransformerFunction;
 import net.minecraftforge.gradle.mcp.function.MCPFunction;
@@ -57,11 +48,7 @@ import net.minecraftforge.gradle.mcp.function.SideAnnotationStripperFunction;
 import net.minecraftforge.gradle.mcp.task.GenerateSRG;
 import net.minecraftforge.gradle.mcp.util.MCPRuntime;
 import net.minecraftforge.gradle.mcp.util.MCPWrapper;
-import net.minecraftforge.gradle.userdev.tasks.AccessTransformJar;
-import net.minecraftforge.gradle.userdev.tasks.ApplyMCPFunction;
-import net.minecraftforge.gradle.userdev.tasks.HackyJavaCompile;
-import net.minecraftforge.gradle.userdev.tasks.RenameJar;
-import net.minecraftforge.gradle.userdev.tasks.RenameJarInPlace;
+import net.minecraftforge.gradle.userdev.tasks.*;
 import net.minecraftforge.srgutils.MinecraftVersion;
 import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
@@ -73,27 +60,15 @@ import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaPluginConvention;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -158,9 +133,9 @@ public class MinecraftUserRepo extends BaseRepo {
         this.isPatcher = !"net.minecraft".equals(GROUP);
 
         repo = SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class)
-            .filter(ArtifactIdentifier.groupEquals(GROUP))
-            .filter(ArtifactIdentifier.nameEquals(NAME))
-            .provide(this)
+                .filter(ArtifactIdentifier.groupEquals(GROUP))
+                .filter(ArtifactIdentifier.nameEquals(NAME))
+                .provide(this)
         );
     }
 
@@ -183,25 +158,24 @@ public class MinecraftUserRepo extends BaseRepo {
         Patcher patcher = parent;
         while (patcher != null) {
             patcher.getLibraries().stream().map(Artifact::from)
-            .filter(e -> GROUP.equals(e.getGroup()) && NAME.equals(e.getName()))
-            .forEach(e -> {
-                String dep = getDependencyString();
-                if (e.getClassifier() != null)
-                {
-                    dep += ":" + e.getClassifier();
-                    if (e.getClassifier().indexOf('.') != -1)
-                        throw new IllegalArgumentException("Can not set Minecraft dependency with classifier containing '.'");
-                }
-                if (e.getExtension() != null && !"jar".equals(e.getExtension()))
-                    dep += "@" + e.getExtension();
+                    .filter(e -> GROUP.equals(e.getGroup()) && NAME.equals(e.getName()))
+                    .forEach(e -> {
+                        String dep = getDependencyString();
+                        if (e.getClassifier() != null) {
+                            dep += ":" + e.getClassifier();
+                            if (e.getClassifier().indexOf('.') != -1)
+                                throw new IllegalArgumentException("Can not set Minecraft dependency with classifier containing '.'");
+                        }
+                        if (e.getExtension() != null && !"jar".equals(e.getExtension()))
+                            dep += "@" + e.getExtension();
 
-                debug("    New Self Dep: " + dep);
-                ExternalModuleDependency _dep = (ExternalModuleDependency)project.getDependencies().create(dep);
-                if (CHANGING_USERDEV) {
-                    _dep.setChanging(true);
-                }
-                cfg.getDependencies().add(_dep);
-            });
+                        debug("    New Self Dep: " + dep);
+                        ExternalModuleDependency _dep = (ExternalModuleDependency) project.getDependencies().create(dep);
+                        if (CHANGING_USERDEV) {
+                            _dep.setChanging(true);
+                        }
+                        cfg.getDependencies().add(_dep);
+                    });
             patcher = patcher.getParent();
         }
 
@@ -230,41 +204,42 @@ public class MinecraftUserRepo extends BaseRepo {
      * Previously, Configuration.resolve() was called indirectly from
      * BaseRepo.getArtifact(). Due to the extensive amount of Gradle code that
      * runs as a result of the resolve() call, deadlock could occur as follows:
-     *
+     * <p>
      * 1. Thread #1: During resolution of a dependency, Gradle calls
      * BaseRepo#getArtifact(). The 'synchronized' block is entering,
      * causing a lock to be taken on the artifact name
-     *
+     * <p>
      * 2. Thread #2: On a different thread, internal Gradle code takes a lock
      * in the class org.gradle.internal.event.DefaultListenerManager.EventBroadcast.ListenerDispatch
-     *
+     * <p>
      * 3. Thread #1: Execution continues on the 'BaseRepo#getArtifact()' call
      * stack, reaching the call to Configuration.resolve(). This call leads
      * to Gradle internally dispatching events through the same class
      * org.gradle.internal.event.DefaultListenerManager.EventBroadcast.ListenerDispatch.
      * This thread is now blocked on the internal Gradle lock taken by Thread #2
-     *
+     * <p>
      * 4. Thread #2: Execution continues, and attempts to resolve the same
      * dependency that Thread #1 is currently resolving. Since Thread #1 is
      * still in the 'synchronized' block with the same artifact name, Thread #2
      * blocks.
-     *
+     * <p>
      * These threads are now deadlocked: Thread #1 is holding the
      * BaseRepo#getArtifact lock while waiting on an internal Gradle lock,
      * while Thread #2 is holding the same internal Gradle lock while waiting
      * on the BaseRepo#getArtifact lock.
-     *
+     * <p>
      * Visit https://git.io/fhHLk to see a stack dump showing this deadlock
-     *
+     * <p>
      * Fortunately, the solution is fairly simply. We can move the entire
      * dependency creation/resolution block to an earlier point in
      * ForgeGradle's execution. Since the client 'data'/'extra'/libraries only
      * depend on the MCP config file, we can do this during plugin
      * initialization.
-     *
+     * <p>
      * This has the added benefit of speeding up ForgeGradle - this block of
      * code will only be executed once, instead of during every call to
      * compileJava
+     *
      * @return
      */
     private Set<File> buildExtraDataFiles() {
@@ -286,15 +261,19 @@ public class MinecraftUserRepo extends BaseRepo {
     private File cacheRaw(String ext) {
         return cache(GROUP.replace('.', File.separatorChar), NAME, VERSION, NAME + '-' + VERSION + '.' + ext);
     }
+
     private File cacheRaw(String classifier, String ext) {
         return cache(GROUP.replace('.', File.separatorChar), NAME, VERSION, NAME + '-' + VERSION + '-' + classifier + '.' + ext);
     }
+
     private File cacheMapped(String mapping, String ext) {
         return cache(GROUP.replace('.', File.separatorChar), NAME, getVersion(mapping), NAME + '-' + getVersion(mapping) + '.' + ext);
     }
+
     private File cacheMapped(String mapping, String classifier, String ext) {
         return cache(GROUP.replace('.', File.separatorChar), NAME, getVersion(mapping), NAME + '-' + getVersion(mapping) + '-' + classifier + '.' + ext);
     }
+
     private File cacheAT(String classifier, String ext) {
         return cache(GROUP.replace('.', File.separatorChar), NAME, getVersionAT(), NAME + '-' + getVersionAT() + '-' + classifier + '.' + ext);
     }
@@ -314,6 +293,7 @@ public class MinecraftUserRepo extends BaseRepo {
             return null;
         return version.split("_at_")[1];
     }
+
     private String getMappings(String version) {
         if (!version.contains("_mapped_"))
             return null;
@@ -323,10 +303,12 @@ public class MinecraftUserRepo extends BaseRepo {
     private String getVersion(String mappings) {
         return mappings == null ? VERSION : VERSION + "_mapped_" + mappings;
     }
+
     private String getVersionWithAT(String mappings) {
         if (AT_HASH == null) return getVersion(mappings);
         return getVersion(mappings) + "_at_" + AT_HASH;
     }
+
     private String getVersionAT() {
         if (AT_HASH == null) return VERSION;
         return VERSION + "_at_" + AT_HASH;
@@ -342,8 +324,8 @@ public class MinecraftUserRepo extends BaseRepo {
                     classifier = "userdev3";
             }
 
-            String artifact = isPatcher ? (GROUP + ":" + NAME +":" + VERSION + ':' + classifier) :
-                                        ("de.oceanlabs.mcp:mcp_config:" + VERSION + "@zip");
+            String artifact = isPatcher ? (GROUP + ":" + NAME + ":" + VERSION + ':' + classifier) :
+                    ("de.oceanlabs.mcp:mcp_config:" + VERSION + "@zip");
             boolean patcher = isPatcher;
             Patcher last = null;
             while (artifact != null) {
@@ -406,9 +388,12 @@ public class MinecraftUserRepo extends BaseRepo {
             return findPom(mappings, rand);
         } else {
             switch (classifier) {
-                case "":        return findRaw(mappings);
-                case "sources": return findSource(mappings, true);
-                default:        return findExtraClassifier(mappings, classifier, ext);
+                case "":
+                    return findRaw(mappings);
+                case "sources":
+                    return findSource(mappings, true);
+                default:
+                    return findExtraClassifier(mappings, classifier, ext);
             }
         }
     }
@@ -445,7 +430,7 @@ public class MinecraftUserRepo extends BaseRepo {
         File ret = MavenArtifactDownloader.generate(project, desc, CHANGING_USERDEV);
         if (ret == null) {
             String message = "Could not download MCP Mappings: " + desc;
-            debug ("    " + message);
+            debug("    " + message);
             project.getLogger().error(message);
             throw new IllegalStateException(message);
         }
@@ -471,7 +456,7 @@ public class MinecraftUserRepo extends BaseRepo {
             debug("  Finding Pom: Cache Hit");
         } else {
             debug("  Finding Pom: " + pom);
-            POMBuilder builder = new POMBuilder(rand + GROUP, NAME, getVersionWithAT(mapping) );
+            POMBuilder builder = new POMBuilder(rand + GROUP, NAME, getVersionWithAT(mapping));
 
             //builder.dependencies().add(rand + GROUP + ':' + NAME + ':' + getVersionWithAT(mapping), "compile"); //Normal poms dont reference themselves...
             builder.dependencies().add("net.minecraft:client:" + mcp.getMCVersion() + ":extra", "compile"); //Client as that has all deps as external list
@@ -532,7 +517,7 @@ public class MinecraftUserRepo extends BaseRepo {
     private File findRaw(String mapping) throws IOException {
         File names = findMapping(mapping);
         HashStore cache = commonHash(names)
-            .add("codever", "2");
+                .add("codever", "2");
 
         if (mapping != null && names == null) {
             debug("  Finding Raw: Could not find names, exiting");
@@ -587,7 +572,7 @@ public class MinecraftUserRepo extends BaseRepo {
             //Build and inject MCP injected sources
             File inject_src = cacheRaw("inject_src", "jar");
             try (ZipInputStream zin = new ZipInputStream(new FileInputStream(mcp.getZip()));
-                 ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(inject_src)) ) {
+                 ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(inject_src))) {
                 String prefix = mcp.wrapper.getConfig().getData("inject");
                 String template = null;
                 ZipEntry entry = null;
@@ -726,25 +711,25 @@ public class MinecraftUserRepo extends BaseRepo {
                 }
 
                 Set<String> vanillaClasses = tmp.stream()
-                .map(ZipEntry::getName)
-                .filter(e -> e.endsWith(".class"))
-                .map(e -> e.substring(0, e.length() - 6))
-                .collect(Collectors.toSet());
+                        .map(ZipEntry::getName)
+                        .filter(e -> e.endsWith(".class"))
+                        .map(e -> e.substring(0, e.length() - 6))
+                        .collect(Collectors.toSet());
 
                 MappingFile o2s = MappingFile.load(obf2Srg);
                 o2s.getClasses().stream()
-                .filter(e -> vanillaClasses.contains(e.getOriginal()))
-                .map(MappingFile.Node::getMapped)
-                .map(e -> e.indexOf('/') == -1 ? "" : e.substring(0, e.lastIndexOf('/')))
-                .forEach(packages::add);
+                        .filter(e -> vanillaClasses.contains(e.getOriginal()))
+                        .map(MappingFile.Node::getMapped)
+                        .map(e -> e.indexOf('/') == -1 ? "" : e.substring(0, e.lastIndexOf('/')))
+                        .forEach(packages::add);
 
             } else {
                 //Gather vanilla packages, so we can only inject the proper package-info classes.
                 tmp.stream()
-                .map(ZipEntry::getName)
-                .filter(e -> e.endsWith(".class"))
-                .map(e -> e.indexOf('/') == -1 ? "" : e.substring(0, e.lastIndexOf('/')))
-                .forEach(packages::add);
+                        .map(ZipEntry::getName)
+                        .filter(e -> e.endsWith(".class"))
+                        .map(e -> e.indexOf('/') == -1 ? "" : e.substring(0, e.lastIndexOf('/')))
+                        .forEach(packages::add);
             }
         }
 
@@ -772,7 +757,7 @@ public class MinecraftUserRepo extends BaseRepo {
             try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(merged))) {
 
                 //Add binpatched, then vanilla. First seen overrides any other entries
-                for (File file : new File[] {binpatched, clean}) {
+                for (File file : new File[]{binpatched, clean}) {
                     try (ZipInputStream zin = new ZipInputStream(new FileInputStream(file))) {
                         ZipEntry entry;
                         while ((entry = zin.getNextEntry()) != null) {
@@ -811,9 +796,9 @@ public class MinecraftUserRepo extends BaseRepo {
     private void copyResources(ZipOutputStream zip, Set<String> added, boolean includeClasses) throws IOException {
         Map<String, List<String>> servicesLists = new HashMap<>();
         Predicate<String> filter = (name) ->
-            added.contains(name) ||
-            (!includeClasses && name.endsWith(".class")) ||
-            (name.startsWith("META-INF") && (name.endsWith(".DSA") || name.endsWith(".SF")));
+                added.contains(name) ||
+                        (!includeClasses && name.endsWith(".class")) ||
+                        (name.startsWith("META-INF") && (name.endsWith(".DSA") || name.endsWith(".SF")));
 
         // Walk parents and combine from bottom up so we get any overridden files.
         Patcher patcher = parent;
@@ -873,7 +858,7 @@ public class MinecraftUserRepo extends BaseRepo {
             patcher = patcher.getParent();
         }
 
-        for(Map.Entry<String, List<String>> kv : servicesLists.entrySet()) {
+        for (Map.Entry<String, List<String>> kv : servicesLists.entrySet()) {
             String name = kv.getKey();
             ZipEntry _new = new ZipEntry(name);
             _new.setTime(0);
@@ -899,8 +884,8 @@ public class MinecraftUserRepo extends BaseRepo {
         File file = new File(root, "obf_to_srg." + ext);
 
         HashStore cache = new HashStore()
-            .add("mcp", mcp.getZip())
-            .load(new File(root, "obf_to_srg." + ext + ".input"));
+                .add("mcp", mcp.getZip())
+                .load(new File(root, "obf_to_srg." + ext + ".input"));
 
         if (!cache.isSame() || !file.exists()) {
             byte[] data = mcp.getData("mappings");
@@ -922,9 +907,9 @@ public class MinecraftUserRepo extends BaseRepo {
         File srg = new File(root, srg_name);
 
         HashStore cache = new HashStore()
-            .add("mcp", mcp.getZip())
-            .add("mapping", names)
-            .load(new File(root, srg_name + ".input"));
+                .add("mcp", mcp.getZip())
+                .add("mapping", names)
+                .load(new File(root, srg_name + ".input"));
 
         if (!cache.isSame() || !srg.exists()) {
             info("Creating SRG -> MCP TSRG");
@@ -935,10 +920,10 @@ public class MinecraftUserRepo extends BaseRepo {
 
             obf_to_srg.getPackages().forEach(e -> srg_to_named.addPackage(e.getMapped(), e.getMapped()));
             obf_to_srg.getClasses().forEach(cls -> {
-               srg_to_named.addClass(cls.getMapped(), cls.getMapped());
-               MappingFile.Cls _cls = srg_to_named.getClass(cls.getMapped());
-               cls.getFields().forEach(fld -> _cls.addField(fld.getMapped(), mcp_names.rename(fld.getMapped())));
-               cls.getMethods().forEach(mtd -> _cls.addMethod(mtd.getMapped(), mtd.getMappedDescriptor(), mcp_names.rename(mtd.getMapped())));
+                srg_to_named.addClass(cls.getMapped(), cls.getMapped());
+                MappingFile.Cls _cls = srg_to_named.getClass(cls.getMapped());
+                cls.getFields().forEach(fld -> _cls.addField(fld.getMapped(), mcp_names.rename(fld.getMapped())));
+                cls.getMethods().forEach(mtd -> _cls.addMethod(mtd.getMapped(), mtd.getMappedDescriptor(), mcp_names.rename(mtd.getMapped())));
             });
 
             srg_to_named.write(MappingFile.Format.TSRG, srg, false);
@@ -1143,15 +1128,15 @@ public class MinecraftUserRepo extends BaseRepo {
 
             boolean addJavadocs = parent == null || parent.getConfigV2() == null || parent.getConfigV2().processor == null;
             debug("    Renaming Sources, Javadocs: " + addJavadocs);
-            try(ZipInputStream zin = new ZipInputStream(new FileInputStream(patched));
-                ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(sources))) {
+            try (ZipInputStream zin = new ZipInputStream(new FileInputStream(patched));
+                 ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(sources))) {
                 ZipEntry _old;
                 while ((_old = zin.getNextEntry()) != null) {
                     String name = _old.getName();
                     zout.putNextEntry(Utils.getStableEntry(name));
 
                     if (name.endsWith(".java")) {
-                        String mapped = map.rename(zin, addJavadocs && vanilla.contains(name.substring(0, name.length() - 5)));
+                        String mapped = map.rename(project, zin, addJavadocs && vanilla.contains(name.substring(0, name.length() - 5)));
                         IOUtils.write(mapped, zout);
                     } else {
                         IOUtils.copy(zin, zout);
@@ -1234,7 +1219,7 @@ public class MinecraftUserRepo extends BaseRepo {
 
         cache.load(cacheMapped(mapping, classifier, extension + ".input"));
         if (cache.isSame() && target.exists()) {
-            debug ("    Cache hit");
+            debug("    Cache hit");
         } else {
             if (original == null) {
                 debug("    Failed to download original artifact.");
@@ -1256,11 +1241,13 @@ public class MinecraftUserRepo extends BaseRepo {
     private String getNextTaskName(String prefix) {
         return '_' + prefix + "_" + compileTaskCount++;
     }
+
     private <T extends Task> T createTask(String prefix, Class<T> cls) {
         return project.getTasks().create(getNextTaskName(prefix), cls);
     }
 
     private int compileTaskCount = 1;
+
     private File compileJava(File source, File... extraDeps) {
         HackyJavaCompile compile = createTask("compileJava", HackyJavaCompile.class);
         try {
@@ -1357,9 +1344,11 @@ public class MinecraftUserRepo extends BaseRepo {
         public UserdevConfigV1 getConfig() {
             return config;
         }
+
         public UserdevConfigV2 getConfigV2() {
             return this.configv2;
         }
+
         public boolean parentIsMcp() {
             return this.config.mcp != null;
         }
@@ -1367,6 +1356,7 @@ public class MinecraftUserRepo extends BaseRepo {
         public void setParent(Patcher value) {
             this.parent = value;
         }
+
         public Patcher getParent() {
             return this.parent;
         }
@@ -1432,6 +1422,7 @@ public class MinecraftUserRepo extends BaseRepo {
         public File getUniversal() {
             return universal;
         }
+
         public File getSources() {
             return sources;
         }
@@ -1562,7 +1553,7 @@ public class MinecraftUserRepo extends BaseRepo {
             } catch (Exception e) {
                 e.printStackTrace();
                 log.lifecycle(e.getMessage());
-                if (e instanceof RuntimeException) throw (RuntimeException)e;
+                if (e instanceof RuntimeException) throw (RuntimeException) e;
                 throw new RuntimeException(e);
             }
         }

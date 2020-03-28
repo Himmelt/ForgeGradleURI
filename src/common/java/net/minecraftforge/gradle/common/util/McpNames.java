@@ -51,6 +51,7 @@ import de.siegmar.fastcsv.reader.CsvRow;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.gradle.api.Project;
 
 public class McpNames {
     private static final String NEWLINE = System.getProperty("line.separator");
@@ -247,5 +248,14 @@ public class McpNames {
         }
         matcher.appendTail(buf);
         return buf.toString();
+    }
+
+    public String rename(Project project, InputStream stream, boolean javadocs) throws IOException {
+        boolean disableJavadoc = false;
+        try {
+            disableJavadoc = Boolean.FALSE.equals(project.findProperty("mcpRenameJavadoc"));
+        } catch (Throwable ignored) {
+        }
+        return rename(stream, !disableJavadoc && javadocs);
     }
 }

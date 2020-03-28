@@ -23,7 +23,6 @@ package net.minecraftforge.gradle.userdev.util;
 import net.minecraftforge.gradle.common.util.*;
 import net.minecraftforge.gradle.mcp.MCPRepo;
 import net.minecraftforge.gradle.userdev.tasks.RenameJarSrg2Mcp;
-
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
 import org.w3c.dom.Document;
@@ -164,7 +163,7 @@ public class Deobfuscator {
                     zout.putNextEntry(Utils.getStableEntry(_old.getName()));
 
                     if (_old.getName().endsWith(".java")) {
-                        String mapped = map.rename(zin, false);
+                        String mapped = map.rename(project, zin, false);
                         IOUtils.write(mapped, zout);
                     } else {
                         IOUtils.copy(zin, zout);
