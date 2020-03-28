@@ -2,62 +2,56 @@ package org.soraworld.gradle.forge;
 
 import org.gradle.api.invocation.Gradle;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
+import java.util.function.Function;
 
 /**
  * @author Himmelt
  */
 public final class GradleURI {
 
-    private static final Method postURIRequest, postURLRequest, postStringRequest;
+    private static final Function<URL, URL> postURLRequest;
+    private static final Function<URI, URI> postURIRequest;
+    private static final Function<String, String> postRequest;
 
     static {
-        Method method = null;
+        Function function = null;
         try {
-            method = Gradle.class.getDeclaredMethod("postURIRequest", URI.class);
-            method.setAccessible(true);
+            Field field = Gradle.class.getDeclaredField("postRequest");
+            field.setAccessible(true);
+            function = (Function) field.get(Gradle.class);
         } catch (Throwable ignored) {
         }
-        postURIRequest = method;
-        method = null;
+        postRequest = function;
+        function = null;
         try {
-            method = Gradle.class.getDeclaredMethod("postURLRequest", URL.class);
-            method.setAccessible(true);
+            Field field = Gradle.class.getDeclaredField("postURIRequest");
+            field.setAccessible(true);
+            function = (Function) field.get(Gradle.class);
         } catch (Throwable ignored) {
         }
-        postURLRequest = method;
-        method = null;
+        postURIRequest = function;
+        function = null;
         try {
-            method = Gradle.class.getDeclaredMethod("postURIRequest", String.class);
-            method.setAccessible(true);
+            Field field = Gradle.class.getDeclaredField("postURLRequest");
+            field.setAccessible(true);
+            function = (Function) field.get(Gradle.class);
         } catch (Throwable ignored) {
         }
-        postStringRequest = method;
+        postURLRequest = function;
+    }
+
+    public static String postRequest(String origin) {
+        return postRequest == null ? origin : postRequest.apply(origin);
     }
 
     public static URI postURIRequest(URI originURI) {
-        try {
-            return (URI) postURIRequest.invoke(null, originURI);
-        } catch (Throwable ignored) {
-            return originURI;
-        }
+        return postURIRequest == null ? originURI : postURIRequest.apply(originURI);
     }
 
     public static URL postURLRequest(URL originURL) {
-        try {
-            return (URL) postURLRequest.invoke(null, originURL);
-        } catch (Throwable ignored) {
-            return originURL;
-        }
-    }
-
-    public static String postURIRequest(String originURI) {
-        try {
-            return (String) postStringRequest.invoke(null, originURI);
-        } catch (Throwable ignored) {
-            return originURI;
-        }
+        return postURLRequest == null ? originURL : postURLRequest.apply(originURL);
     }
 }

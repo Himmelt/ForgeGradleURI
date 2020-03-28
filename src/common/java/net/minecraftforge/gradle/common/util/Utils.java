@@ -538,7 +538,7 @@ public class Utils {
 
     private static void testServerConnection(String url) {
         /////////////////////////////////////////////////
-        url = GradleURI.postURIRequest(url);
+        url = GradleURI.postRequest(url);
         /////////////////////////////////////////////////
         try {
             HttpsURLConnection conn = (HttpsURLConnection)new URL(url).openConnection();
