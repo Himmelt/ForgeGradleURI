@@ -20,6 +20,7 @@
 
 package net.minecraftforge.gradle.common.task;
 
+import net.minecraftforge.gradle.common.util.HashFunction;
 import net.minecraftforge.gradle.common.util.Utils;
 import net.minecraftforge.gradle.common.util.VersionJson;
 import org.apache.commons.io.FileUtils;

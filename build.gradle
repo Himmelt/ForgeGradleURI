@@ -21,7 +21,7 @@ def _BINTRAY_KEY = System.getenv('BINTRAY_KEY')
 def _REPO_KEY = snapshot ? 'oss-snapshot-local' : 'oss-release-local'
 
 group = 'net.minecraftforge.gradle'
-version = '3.0.3' + (snapshot ? '-SNAPSHOT' : '')
+version = '3.0.4' + (snapshot ? '-SNAPSHOT' : '')
 
 sourceSets {
     common
